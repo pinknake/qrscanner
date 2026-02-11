@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro QR Scanner</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+background:#0f172a;
+color:white;
+text-align:center;
+}
+
+header{
+padding:15px;
+font-size:20px;
+font-weight:bold;
+background:#1e293b;
+}
+
+#reader{
+width:90%;
+margin:20px auto;
+border-radius:15px;
+overflow:hidden;
+}
+
+button{
+padding:10px 15px;
+margin:5px;
+border:none;
+border-radius:8px;
+background:#2563eb;
+color:white;
+cursor:pointer;
+}
+
+#result{
+margin:15px;
+padding:15px;
+background:#1e293b;
+border-radius:10px;
+word-wrap:break-word;
+}
+
+#installBtn{
+display:none;
+background:#16a34a;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>🚀 Pro QR Scanner</header>
+
+<div id="reader"></div>
+
+<div>
+<button onclick="toggleFlash()">🔦 Flash</button>
+<button onclick="switchCamera()">🔄 Camera</button>
+<button onclick="startGallery()">🖼 Gallery</button>
+<button id="installBtn">📲 Install</button>
+</div>
+
+<div id="result">Scan Result Will Appear Here</div>
+
+<script>
+
+let html5QrCode;
+let currentCameraIndex = 0;
+let cameras = [];
+let flashOn = false;
+let deferredPrompt;
+
+async function startScanner(cameraId=null){
+html5QrCode = new Html5Qrcode("reader");
+
+if(!cameraId){
+cameras = await Html5Qrcode.getCameras();
+cameraId = cameras[0].id;
+}
+
+html5QrCode.start(
+cameraId,
+{ fps: 10, qrbox: 250 },
+qrCodeMessage => handleResult(qrCodeMessage)
+);
+}
+
+function handleResult(text){
+document.getElementById("result").innerHTML = formatResult(text);
+saveHistory(text);
+}
+
+function formatResult(text){
+if(text.startsWith("http"))
+return `<a href="${text}" target="_blank">${text}</a>`;
+if(text.startsWith("mailto:"))
+return `<a href="${text}">${text}</a>`;
+if(text.startsWith("tel:"))
+return `<a href="${text}">${text}</a>`;
+return text;
+}
+
+function toggleFlash(){
+if(html5QrCode){
+flashOn = !flashOn;
+html5QrCode.applyVideoConstraints({
+advanced:[{torch:flashOn}]
+});
+}
+}
+
+async function switchCamera(){
+if(cameras.length > 1){
+currentCameraIndex = (currentCameraIndex+1) % cameras.length;
+await html5QrCode.stop();
+startScanner(cameras[currentCameraIndex].id);
+}
+}
+
+function startGallery(){
+html5QrCode.scanFileV2 = true;
+}
+
+function saveHistory(text){
+let history = JSON.parse(localStorage.getItem("qrHistory")||"[]");
+history.unshift(text);
+localStorage.setItem("qrHistory", JSON.stringify(history));
+}
+
+window.addEventListener('beforeinstallprompt', (e)=>{
+e.preventDefault();
+deferredPrompt = e;
+document.getElementById("installBtn").style.display="inline-block";
+});
+
+document.getElementById("installBtn").addEventListener("click", async ()=>{
+if(deferredPrompt){
+deferredPrompt.prompt();
+}
+});
+
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("sw.js");
+}
+
+startScanner();
+
+</script>
+
+</body>
+</html>
