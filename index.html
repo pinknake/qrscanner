@@ -119,223 +119,229 @@ background:#2a2a2a;
 <div id="result">Scan Result Will Appear Here</div>
 <div id="actions"></div>
 
-
-<script>
+ <script>
 let html5QrCode;
 let currentCameraId = null;
 let cameras = [];
-let scanHistory = JSON.parse(localStorage.getItem("scanHistory")) || [];
+let isScanning = false;
 let deferredPrompt = null;
-let scannerRunning = false;
 
-/* ---------------- PWA INSTALL ---------------- */
+let scanHistory = JSON.parse(localStorage.getItem("scanHistory")) || [];
 
+// -------------------- PWA INSTALL --------------------
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
   const btn = document.getElementById("installBtn");
-  if (btn) btn.style.display = "inline-block";
+  if(btn) btn.style.display = "inline-block";
 });
 
-document.getElementById("installBtn").addEventListener("click", async () => {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  deferredPrompt = null;
-});
+const installBtn = document.getElementById("installBtn");
+if(installBtn){
+  installBtn.addEventListener("click", async () => {
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      deferredPrompt = null;
+      installBtn.style.display = "none";
+    }
+  });
+}
 
-/* ---------------- INIT SCANNER ---------------- */
-
-async function initScanner() {
-  try {
+// -------------------- INIT SCANNER --------------------
+async function initScanner(){
+  try{
     html5QrCode = new Html5Qrcode("reader");
     cameras = await Html5Qrcode.getCameras();
-    if (cameras.length > 0) {
+
+    if(cameras.length){
       currentCameraId = cameras[0].id;
       startScanner();
-    } else {
-      document.getElementById("result").innerHTML = "No camera found";
+    }else{
+      document.getElementById("result").innerText = "No camera found";
     }
-  } catch (err) {
-    document.getElementById("result").innerHTML = "Camera error";
-    console.error(err);
+  }catch(err){
+    document.getElementById("result").innerText = "Camera permission denied";
   }
 }
 
-async function startScanner() {
-  if (scannerRunning) return;
-  try {
+async function startScanner(){
+  if(isScanning) return;
+
+  try{
     await html5QrCode.start(
       currentCameraId,
       { fps: 10, qrbox: 250 },
-      onScanSuccess
+      (decodedText) => {
+        handleResult(decodedText);
+      }
     );
-    scannerRunning = true;
-  } catch (err) {
-    console.error("Start error:", err);
+    isScanning = true;
+  }catch(err){
+    console.log("Start error:", err);
   }
 }
 
-async function stopScanner() {
-  if (!scannerRunning) return;
+async function stopScanner(){
+  if(!isScanning) return;
   await html5QrCode.stop();
-  scannerRunning = false;
+  isScanning = false;
 }
 
-/* ---------------- SCAN SUCCESS ---------------- */
-
-async function onScanSuccess(decodedText) {
-  await stopScanner();
-  handleResult(decodedText);
-}
-
-/* ---------------- FLASH ---------------- */
-
-async function toggleFlash() {
-  try {
+// -------------------- FLASH --------------------
+async function toggleFlash(){
+  try{
     await html5QrCode.applyVideoConstraints({
       advanced: [{ torch: true }]
     });
-  } catch {
+  }catch(err){
     alert("Flash not supported on this device");
   }
 }
 
-/* ---------------- CAMERA SWITCH ---------------- */
-
-async function switchCamera() {
-  if (cameras.length < 2) return;
+// -------------------- CAMERA SWITCH --------------------
+async function switchCamera(){
+  if(cameras.length < 2) return;
 
   await stopScanner();
 
-  const index = cameras.findIndex(cam => cam.id === currentCameraId);
-  const nextIndex = (index + 1) % cameras.length;
-  currentCameraId = cameras[nextIndex].id;
+  currentCameraId =
+    currentCameraId === cameras[0].id
+      ? cameras[1].id
+      : cameras[0].id;
 
   startScanner();
 }
 
-/* ---------------- GALLERY SCAN ---------------- */
-
-function scanFromGallery() {
+// -------------------- GALLERY SCAN --------------------
+function scanFromGallery(){
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "image/*";
 
-  input.onchange = e => {
+  input.onchange = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if(!file) return;
 
-    html5QrCode.scanFile(file, true)
-      .then(decodedText => handleResult(decodedText))
-      .catch(() => alert("No QR found in image"));
+    try{
+      const result = await html5QrCode.scanFile(file, true);
+      handleResult(result);
+    }catch(err){
+      alert("No QR found in image");
+    }
   };
 
   input.click();
 }
 
-/* ---------------- AI TYPE DETECTION ---------------- */
-
-function analyzeQR(data) {
+// -------------------- AI TYPE DETECTION --------------------
+function analyzeQR(data){
   const d = data.toLowerCase();
-  if (d.startsWith("http")) return "🌐 Website";
-  if (d.startsWith("upi://")) return "💰 UPI Payment";
-  if (/^\+?\d{8,15}$/.test(data)) return "📞 Phone Number";
-  if (d.includes("@")) return "📧 Email";
+
+  if(d.startsWith("http")) return "🌐 Website";
+  if(d.startsWith("upi://")) return "💰 UPI Payment";
+  if(/^\+?\d{8,15}$/.test(data)) return "📞 Phone Number";
+  if(d.includes("@")) return "📧 Email";
   return "📝 Text";
 }
 
-/* ---------------- RESULT HANDLING ---------------- */
+// -------------------- HANDLE RESULT --------------------
+async function handleResult(data){
+  await stopScanner();
 
-function handleResult(data) {
   const type = analyzeQR(data);
 
   document.getElementById("result").innerHTML =
-    `<b>Result:</b><br>${escapeHtml(data)}<br><br><b>Type:</b> ${type}`;
+    "<b>Result:</b><br>" + escapeHtml(data) +
+    "<br><br><b>Type:</b> " + type;
 
   createActions(data);
   saveHistory(data, type);
   renderHistory();
 }
 
-/* ---------------- SAFE HTML ESCAPE ---------------- */
-
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.innerText = text;
-  return div.innerHTML;
+// Prevent HTML injection
+function escapeHtml(text){
+  return text.replace(/[&<>"']/g, function(m){
+    return ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#039;"
+    })[m];
+  });
 }
 
-/* ---------------- ACTION BUTTONS ---------------- */
-
-function createActions(data) {
+// -------------------- ACTION BUTTONS --------------------
+function createActions(data){
   const box = document.getElementById("actions");
   box.innerHTML = "";
 
-  if (data.startsWith("http")) {
-    addButton(box, "🌐 Open Link", () => window.open(data, "_blank"));
+  if(data.startsWith("http")){
+    const btn = document.createElement("button");
+    btn.className = "action-btn";
+    btn.innerText = "🌐 Open Link";
+    btn.onclick = () => window.open(data, "_blank");
+    box.appendChild(btn);
   }
 
-  if (data.startsWith("upi://")) {
-    addButton(box, "💰 Pay", () => window.location.href = data);
-  }
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "action-btn";
+  copyBtn.innerText = "📋 Copy";
+  copyBtn.onclick = () => navigator.clipboard.writeText(data);
+  box.appendChild(copyBtn);
 
-  addButton(box, "📋 Copy", () => {
-    navigator.clipboard.writeText(data);
-    alert("Copied!");
-  });
-
-  addButton(box, "🔄 Scan Again", () => {
-    box.innerHTML = "";
-    document.getElementById("result").innerHTML = "Scanning...";
-    startScanner();
-  });
+  const scanBtn = document.createElement("button");
+  scanBtn.className = "action-btn";
+  scanBtn.innerText = "🔄 Scan Again";
+  scanBtn.onclick = restartScan;
+  box.appendChild(scanBtn);
 }
 
-function addButton(parent, text, action) {
-  const btn = document.createElement("button");
-  btn.className = "action-btn";
-  btn.innerText = text;
-  btn.onclick = action;
-  parent.appendChild(btn);
+async function restartScan(){
+  document.getElementById("actions").innerHTML = "";
+  document.getElementById("result").innerHTML = "Scanning...";
+  startScanner();
 }
 
-/* ---------------- HISTORY ---------------- */
-
-function saveHistory(data, type) {
+// -------------------- HISTORY --------------------
+function saveHistory(data, type){
   scanHistory.unshift({
     text: data,
     type: type,
     time: new Date().toLocaleString()
   });
 
-  if (scanHistory.length > 20) scanHistory.pop();
+  if(scanHistory.length > 20) scanHistory.pop();
 
   localStorage.setItem("scanHistory", JSON.stringify(scanHistory));
 }
 
-function renderHistory() {
+function renderHistory(){
   const box = document.getElementById("history");
   box.innerHTML = "<h3>History</h3>";
 
   scanHistory.forEach(item => {
     const div = document.createElement("div");
     div.className = "history-item";
-    div.innerHTML = `${item.type}<br><small>${escapeHtml(item.text.substring(0, 30))}</small>`;
+    div.innerHTML =
+      item.type +
+      "<br><small>" +
+      escapeHtml(item.text.substring(0,30)) +
+      "</small>";
+
     div.onclick = () => handleResult(item.text);
+
     box.appendChild(div);
   });
 }
 
-/* ---------------- SERVICE WORKER ---------------- */
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js")
-    .catch(err => console.log("SW error:", err));
+// -------------------- SERVICE WORKER --------------------
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js");
 }
 
-/* ---------------- START ---------------- */
-
+// Start
 renderHistory();
 initScanner();
 </script>
