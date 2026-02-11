@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro QR Scanner</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+
+<style>
+body{margin:0;font-family:Arial;background:#000;color:#fff;text-align:center;}
+header{padding:15px;font-size:20px;font-weight:bold;}
+#reader{width:100%;max-width:400px;margin:auto;}
+button{
+  padding:10px 14px;
+  margin:6px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+}
+#flashBtn{background:#ffc107;}
+#galleryBtn{background:#17a2b8;color:#fff;}
+#shareBtn{background:#28a745;color:#fff;}
+#installBtn{background:#007bff;color:#fff;}
+#result{
+  margin:15px;
+  padding:10px;
+  background:#111;
+  border-radius:8px;
+  word-break:break-all;
+}
+.history{
+  max-width:400px;
+  margin:auto;
+  text-align:left;
+  padding:10px;
+}
+.history div{
+  background:#111;
+  padding:8px;
+  margin:5px 0;
+  border-radius:6px;
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<header>Pro QR Scanner</header>
+
+<div id="reader"></div>
+
+<div>
+<button id="flashBtn">🔦 Flash</button>
+<button id="galleryBtn">🖼 Scan Image</button>
+<button id="shareBtn">🔗 Share</button>
+<button id="installBtn" style="display:none;">Install</button>
+</div>
+
+<div id="result">Scan a QR Code</div>
+<div class="history" id="historyBox"></div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+
+<script>
+let scanner;
+let torchOn=false;
+let deferredPrompt;
+let lastResult="";
+
+// Start Scanner
+function startScanner(){
+  scanner = new Html5Qrcode("reader");
+
+  Html5Qrcode.getCameras().then(devices=>{
+    if(devices && devices.length){
+      scanner.start(
+        devices[0].id,
+        { fps:10, qrbox:250 },
+        onScanSuccess
+      );
+    }
+  });
+}
+
+function onScanSuccess(text){
+  if(text===lastResult) return;
+  lastResult=text;
+
+  feedback();
+  document.getElementById("result").innerHTML=
+    `<a href="${text}" target="_blank">${text}</a>`;
+
+  saveHistory(text);
+}
+
+// Sound + vibration
+function feedback(){
+  if(navigator.vibrate) navigator.vibrate(50);
+  const audio = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+  audio.play();
+}
+
+// Torch toggle
+document.getElementById("flashBtn").onclick=async ()=>{
+  try{
+    torchOn=!torchOn;
+    await scanner.applyVideoConstraints({
+      advanced:[{torch:torchOn}]
+    });
+  }catch(e){
+    alert("Torch not supported");
+  }
+};
+
+// Scan from Gallery
+document.getElementById("galleryBtn").onclick=()=>{
+  scanner.scanFileV2().then(result=>{
+    onScanSuccess(result.decodedText);
+  }).catch(err=>{
+    alert("No QR found");
+  });
+};
+
+// Share
+document.getElementById("shareBtn").onclick=()=>{
+  if(!lastResult) return alert("No result");
+  if(navigator.share){
+    navigator.share({title:"QR Result",text:lastResult,url:lastResult});
+  }else{
+    navigator.clipboard.writeText(lastResult);
+    alert("Copied to clipboard");
+  }
+};
+
+// History
+function saveHistory(data){
+  let h=JSON.parse(localStorage.getItem("qrHistory")||"[]");
+  h.unshift(data);
+  h=h.slice(0,10);
+  localStorage.setItem("qrHistory",JSON.stringify(h));
+  loadHistory();
+}
+
+function loadHistory(){
+  let h=JSON.parse(localStorage.getItem("qrHistory")||"[]");
+  let box=document.getElementById("historyBox");
+  box.innerHTML="";
+  h.forEach(item=>{
+    let div=document.createElement("div");
+    div.innerHTML=item;
+    div.onclick=()=>window.open(item,"_blank");
+    box.appendChild(div);
+  });
+}
+
+loadHistory();
+startScanner();
+
+// PWA Install
+window.addEventListener("beforeinstallprompt",(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  installBtn.style.display="inline-block";
+});
+
+installBtn.onclick=async ()=>{
+  deferredPrompt.prompt();
+  const {outcome}=await deferredPrompt.userChoice;
+  if(outcome==="accepted"){
+    installBtn.style.display="none";
+  }
+};
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+
+</body>
+</html>
