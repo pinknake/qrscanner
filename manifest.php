@@ -1,4 +1,3 @@
-
 {
 "name": "Pro QR Scanner",
 "short_name": "QR Scanner",
@@ -7,10 +6,10 @@
 "background_color": "#0f172a",
 "theme_color": "#0f172a",
 "icons": [
-{
-"src": "https://cdn-icons-png.flaticon.com/512/483/483408.png",
-"sizes": "512x512",
-"type": "image/png"
-}
-]
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1828/1828919.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
 }
