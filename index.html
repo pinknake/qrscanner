@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro QR Scanner</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+background:#0f172a;
+color:white;
+text-align:center;
+}
+
+header{
+padding:15px;
+font-size:20px;
+font-weight:bold;
+background:#1e293b;
+}
+
+#reader{
+width:90%;
+margin:20px auto;
+border-radius:15px;
+overflow:hidden;
+}
+
+button{
+padding:10px 15px;
+margin:5px;
+border:none;
+border-radius:8px;
+background:#2563eb;
+color:white;
+cursor:pointer;
+}
+
+#result{
+margin:15px;
+padding:15px;
+background:#1e293b;
+border-radius:10px;
+word-wrap:break-word;
+}
+.action-btn {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: #1a73e8;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+.action-btn:hover {
+  background: #155ec0;
+  }
+  
+#installBtn{
+display:none;
+background:#16a34a;
+}
+
+  .sidebar {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 250px;
+  height: 100%;
+  overflow-y: auto;
+  background: #111;
+  color: white;
+  padding: 15px;
+}
+
+.history-item {
+  background: #1f1f1f;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.history-item:hover {
+  background: #2a2a2a;
+  }
+
+  
+</style>
+</head>
+
+<body>
+
+<header>🚀 Pro QR Scanner</header>
+
+<div id="reader"></div>
+<div class="sidebar" id="history"></div>
+<div>
+<button onclick="toggleFlash()">🔦 Flash</button>
+<button onclick="switchCamera()">🔄 Camera</button>
+<button onclick="startGallery()">🖼 Gallery</button>
+<button id="installBtn">📲 Install</button>
+</div>
+
+<div id="result">Scan Result Will Appear Here</div>
+
+<script>
+  const video = document.getElementById("video");
+const resultBox = document.getElementById("result");
+const actionBox = document.getElementById("actions");
+const historyBox = document.getElementById("history");
+
+const canvas = document.createElement("canvas");
+const ctx = canvas.getContext("2d");
+
+let currentStream = null;
+let scanHistory = JSON.parse(localStorage.getItem("scanHistory")) || [];
+
+// Start Camera
+async function startCamera() {
+  try {
+    currentStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
+    video.srcObject = currentStream;
+    scanLoop();
+  } catch (err) {
+    resultBox.innerHTML = "Camera permission denied";
+  }
+}
+
+function stopCamera() {
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => track.stop());
+  }
+}
+
+function scanLoop() {
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+    if (code) {
+      handleResult(code.data);
+      return;
+    }
+  }
+  requestAnimationFrame(scanLoop);
+}
+
+// 🔥 AI ANALYZE FUNCTION
+function analyzeQR(data) {
+  const lower = data.toLowerCase();
+
+  if (lower.startsWith("http")) return "🌐 Website Link";
+  if (lower.startsWith("upi://")) return "💰 UPI Payment QR";
+  if (/^\+?\d{8,15}$/.test(data)) return "📞 Phone Number";
+  if (data.includes("@")) return "📧 Email Address";
+  if (lower.startsWith("wifi:")) return "📶 WiFi Configuration QR";
+
+  return "📝 Plain Text / Unknown QR";
+}
+
+function handleResult(data) {
+  stopCamera();
+  actionBox.innerHTML = "";
+
+  const type = analyzeQR(data);
+
+  resultBox.innerHTML = `
+    <b>Scanned:</b><br>${data}<br><br>
+    <b>AI Type:</b> ${type}
+  `;
+
+  saveHistory(data, type);
+  renderHistory();
+
+  createSmartActions(data);
+
+  actionBox.appendChild(makeButton("🔄 Scan Again", () => {
+    resultBox.innerHTML = "";
+    actionBox.innerHTML = "";
+    startCamera();
+  }));
+}
+
+// Save History
+function saveHistory(data, type) {
+  scanHistory.unshift({
+    text: data,
+    type: type,
+    time: new Date().toLocaleString()
+  });
+
+  if (scanHistory.length > 20) scanHistory.pop();
+
+  localStorage.setItem("scanHistory", JSON.stringify(scanHistory));
+}
+
+// Render Sidebar History
+function renderHistory() {
+  historyBox.innerHTML = "<h3>Scan History</h3>";
+
+  scanHistory.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.innerHTML = `
+      <small>${item.time}</small><br>
+      <b>${item.type}</b><br>
+      <span>${item.text.substring(0,40)}</span>
+    `;
+    div.onclick = () => handleResult(item.text);
+    historyBox.appendChild(div);
+  });
+}
+
+// Smart Action Buttons
+function createSmartActions(data) {
+  const lower = data.toLowerCase();
+
+  if (lower.startsWith("http")) {
+    actionBox.appendChild(makeButton("🌐 Open Link", () => {
+      window.location.href = data;
+    }));
+  }
+  else if (lower.startsWith("upi://")) {
+    actionBox.appendChild(makeButton("💰 Pay via UPI", () => {
+      window.location.href = data;
+    }));
+  }
+  else if (/^\+?\d{8,15}$/.test(data)) {
+    actionBox.appendChild(makeButton("📞 Call", () => {
+      window.location.href = "tel:" + data;
+    }));
+  }
+  else if (data.includes("@")) {
+    actionBox.appendChild(makeButton("📧 Send Email", () => {
+      window.location.href = "mailto:" + data;
+    }));
+  }
+  else {
+    actionBox.appendChild(makeButton("📋 Copy Text", () => {
+      navigator.clipboard.writeText(data);
+      alert("Copied!");
+    }));
+  }
+}
+
+function makeButton(text, action) {
+  const btn = document.createElement("button");
+  btn.innerText = text;
+  btn.onclick = action;
+  btn.className = "action-btn";
+  return btn;
+}
+
+// Auto start
+renderHistory();
+startCamera();
+
+  
+</script>
+
+</body>
+</html>
