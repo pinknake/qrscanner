@@ -104,7 +104,7 @@ background:#16a34a;
 <header>🚀 Pro QR Scanner</header>
 
 <div id="reader"></div>
-<div class="sidebar" id="history"></div>
+
 <div>
 <button onclick="toggleFlash()">🔦 Flash</button>
 <button onclick="switchCamera()">🔄 Camera</button>
@@ -265,6 +265,22 @@ function makeButton(text, action) {
   btn.onclick = action;
   btn.className = "action-btn";
   return btn;
+}
+  
+window.addEventListener('beforeinstallprompt', (e)=>{
+e.preventDefault();
+deferredPrompt = e;
+document.getElementById("installBtn").style.display="inline-block";
+});
+
+document.getElementById("installBtn").addEventListener("click", async ()=>{
+if(deferredPrompt){
+deferredPrompt.prompt();
+}
+});
+
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("sw.js");
 }
 
 // Auto start
