@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Test</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+body{margin:0;background:#000;color:#fff;text-align:center;}
+video{width:100%;max-width:400px;}
+canvas{display:none;}
+</style>
+</head>
+<body>
+
+<h2>QR Scanner Test</h2>
+<video id="video" autoplay></video>
+<canvas id="canvas"></canvas>
+<div id="result">Scanning...</div>
+
+<script>
+const video=document.getElementById("video");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+const result=document.getElementById("result");
+
+navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}})
+.then(stream=>{
+  video.srcObject=stream;
+  requestAnimationFrame(scan);
+})
+.catch(err=>{
+  result.innerText="Camera Error: "+err;
+});
+
+function scan(){
+  if(video.readyState===video.HAVE_ENOUGH_DATA){
+    canvas.width=video.videoWidth;
+    canvas.height=video.videoHeight;
+    ctx.drawImage(video,0,0);
+    const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code=jsQR(imageData.data,canvas.width,canvas.height);
+    if(code){
+      result.innerHTML=`<a href="${code.data}" target="_blank">${code.data}</a>`;
+      return;
+    }
+  }
+  requestAnimationFrame(scan);
+}
+</script>
+
+</body>
+</html>
