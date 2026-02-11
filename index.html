@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DarkScanner Pro</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body{
+margin:0;
+background:#000;
+color:#00ff88;
+font-family:monospace;
+display:flex;
+flex-direction:column;
+align-items:center;
+}
+
+h1{
+text-shadow:0 0 10px #00ff88;
+}
+
+#reader{
+width:90%;
+max-width:400px;
+margin-top:10px;
+border:2px solid #00ff88;
+box-shadow:0 0 20px #00ff88;
+}
+
+button{
+background:#001a00;
+color:#00ff88;
+border:1px solid #00ff88;
+padding:10px 15px;
+margin:5px;
+cursor:pointer;
+box-shadow:0 0 10px #00ff88;
+}
+
+button:hover{
+background:#003300;
+}
+
+#result{
+margin-top:15px;
+word-break:break-all;
+text-align:center;
+}
+
+.history{
+margin-top:20px;
+width:90%;
+max-width:400px;
+border-top:1px solid #00ff88;
+padding-top:10px;
+}
+
+.history-item{
+font-size:12px;
+margin-bottom:5px;
+border-bottom:1px dashed #00ff88;
+padding-bottom:3px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>DarkScanner Pro</h1>
+
+<div id="reader"></div>
+
+<div>
+<button onclick="toggleTorch()">Torch</button>
+<button onclick="scanImage()">Scan Image</button>
+<button onclick="copyResult()">Copy</button>
+<button onclick="shareResult()">Share</button>
+<button onclick="switchCamera()">Switch Camera</button>
+  <button id="installBtn" style="display:none;">Install</button>
+</div>
+
+<div id="result">No Scan Yet</div>
+
+<div class="history" id="history"></div>
+
+<input type="file" id="fileInput" accept="image/*" hidden>
+
+<<script>
+
+let lastResult = "";
+let html5QrCode;
+let cameras = [];
+let currentCameraIndex = 0;
+let torchOn = false;
+let deferredPrompt = null;
+let scannerRunning = false;
+
+/* ---------------- INIT SCANNER ---------------- */
+
+async function startScanner() {
+  try {
+    html5QrCode = new Html5Qrcode("reader");
+    cameras = await Html5Qrcode.getCameras();
+
+    if (!cameras.length) {
+      document.getElementById("result").innerText = "No camera found";
+      return;
+    }
+
+    // Prefer back camera
+    const backCam = cameras.find(cam =>
+      cam.label.toLowerCase().includes("back") ||
+      cam.label.toLowerCase().includes("environment")
+    );
+
+    currentCameraIndex = backCam ? cameras.indexOf(backCam) : 0;
+
+    await runCamera();
+
+  } catch (err) {
+    document.getElementById("result").innerText = "Camera permission denied";
+  }
+}
+
+async function runCamera() {
+  if (scannerRunning) return;
+
+  scannerRunning = true;
+
+  await html5QrCode.start(
+    cameras[currentCameraIndex].id,
+    { fps: 10, qrbox: 250 },
+    (decodedText) => {
+      if (decodedText !== lastResult) {
+        lastResult = decodedText;
+        onScanSuccess(decodedText);
+      }
+    }
+  );
+}
+
+/* ---------------- SCAN SUCCESS ---------------- */
+
+function onScanSuccess(message) {
+
+  if (navigator.vibrate) navigator.vibrate(200);
+  playBeep();
+
+  document.getElementById("result").innerHTML = detectURL(message);
+
+  saveHistory(message);
+
+  if (isURL(message)) {
+    setTimeout(() => window.open(message, "_blank"), 800);
+  }
+}
+
+/* ---------------- URL DETECTION ---------------- */
+
+function isURL(str) {
+  return /^https?:\/\//i.test(str);
+}
+
+function detectURL(text) {
+  if (isURL(text)) {
+    return `<a href="${text}" target="_blank" style="color:#00ff88">${text}</a>`;
+  }
+  return text;
+}
+
+/* ---------------- CAMERA SWITCH ---------------- */
+
+async function switchCamera() {
+  if (cameras.length < 2) return;
+
+  await html5QrCode.stop();
+  scannerRunning = false;
+
+  currentCameraIndex =
+    (currentCameraIndex + 1) % cameras.length;
+
+  runCamera();
+}
+
+/* ---------------- TORCH ---------------- */
+
+async function toggleTorch() {
+  try {
+    torchOn = !torchOn;
+    await html5QrCode.applyVideoConstraints({
+      advanced: [{ torch: torchOn }]
+    });
+  } catch (err) {
+    alert("Torch not supported on this device");
+  }
+}
+
+/* ---------------- IMAGE SCAN ---------------- */
+
+function scanImage() {
+  document.getElementById("fileInput").click();
+}
+
+document.getElementById("fileInput").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const result = await html5QrCode.scanFile(file, true);
+  onScanSuccess(result);
+});
+
+/* ---------------- COPY & SHARE ---------------- */
+
+function copyResult() {
+  if (!lastResult) return;
+  navigator.clipboard.writeText(lastResult);
+  alert("Copied!");
+}
+
+function shareResult() {
+  if (navigator.share && lastResult) {
+    navigator.share({ text: lastResult });
+  }
+}
+
+/* ---------------- BEEP ---------------- */
+
+function playBeep() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const oscillator = ctx.createOscillator();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(1000, ctx.currentTime);
+  oscillator.connect(ctx.destination);
+  oscillator.start();
+  oscillator.stop(ctx.currentTime + 0.1);
+}
+
+/* ---------------- HISTORY ---------------- */
+
+function saveHistory(text) {
+  let history = JSON.parse(localStorage.getItem("qrHistory") || "[]");
+  history.unshift(text);
+  history = history.slice(0, 10);
+  localStorage.setItem("qrHistory", JSON.stringify(history));
+  renderHistory();
+}
+
+function renderHistory() {
+  let history = JSON.parse(localStorage.getItem("qrHistory") || "[]");
+  let container = document.getElementById("history");
+  container.innerHTML = "";
+
+  history.forEach(item => {
+    let div = document.createElement("div");
+    div.className = "history-item";
+    div.innerText = item;
+    container.appendChild(div);
+  });
+}
+
+/* ---------------- PWA INSTALL ---------------- */
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById("installBtn").style.display = "inline-block";
+});
+
+document.getElementById("installBtn").addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById("installBtn").style.display = "none";
+});
+
+/* ---------------- START ---------------- */
+
+startScanner();
+renderHistory();
+
+</script>
+</body>
+</html>
