@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro QR Scanner</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+
+<style>
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background:#000;
+  color:#fff;
+  text-align:center;
+}
+header{
+  padding:15px;
+  font-size:20px;
+  font-weight:bold;
+}
+video{
+  width:100%;
+  max-width:400px;
+  border-radius:15px;
+}
+.controls{
+  margin:15px;
+}
+button{
+  padding:10px 15px;
+  margin:5px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+}
+#installBtn{background:#28a745;color:#fff;}
+#flashBtn{background:#ffc107;}
+#result{
+  margin:15px;
+  padding:10px;
+  background:#111;
+  border-radius:8px;
+  word-break:break-all;
+}
+.history{
+  max-width:400px;
+  margin:auto;
+  text-align:left;
+  padding:10px;
+}
+.history div{
+  background:#111;
+  padding:8px;
+  margin:5px 0;
+  border-radius:6px;
+  cursor:pointer;
+}
+.toast{
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#111;
+  padding:10px 15px;
+  border-radius:8px;
+  display:none;
+}
+</style>
+</head>
+
+<body>
+
+<header>Pro QR Scanner</header>
+
+<video id="preview"></video>
+
+<div class="controls">
+  <button id="flashBtn">🔦 Flash</button>
+  <button id="installBtn" style="display:none;">Install App</button>
+</div>
+
+<div id="result">Scan a QR code</div>
+
+<div class="history" id="historyBox"></div>
+
+<div class="toast" id="toast">Installed ✅</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<script>
+let html5QrCode;
+let torchOn=false;
+let currentTrack;
+let deferredPrompt;
+
+// Start Scanner
+function startScanner(){
+  html5QrCode = new Html5Qrcode("preview");
+  Html5Qrcode.getCameras().then(devices=>{
+    html5QrCode.start(
+      devices[0].id,
+      {fps:10,qrbox:250},
+      onScanSuccess
+    );
+  });
+}
+
+function onScanSuccess(decodedText){
+  feedback();
+  document.getElementById("result").innerHTML =
+    `<a href="${decodedText}" target="_blank">${decodedText}</a>`;
+  saveHistory(decodedText);
+
+  setTimeout(()=>{
+    document.getElementById("result").innerHTML="Scan next QR";
+  },2000);
+}
+
+function feedback(){
+  if(navigator.vibrate) navigator.vibrate(50);
+  new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=").play();
+}
+
+// Flash toggle
+document.getElementById("flashBtn").onclick=async function(){
+  const tracks=html5QrCode.getRunningTrackCapabilities();
+  if(!tracks.torch) return alert("Torch not supported");
+  torchOn=!torchOn;
+  await html5QrCode.applyVideoConstraints({
+    advanced:[{torch:torchOn}]
+  });
+};
+
+// History
+function saveHistory(data){
+  let h=JSON.parse(localStorage.getItem("qrHistory")||"[]");
+  h.unshift(data);
+  h=h.slice(0,10);
+  localStorage.setItem("qrHistory",JSON.stringify(h));
+  loadHistory();
+}
+
+function loadHistory(){
+  let h=JSON.parse(localStorage.getItem("qrHistory")||"[]");
+  let box=document.getElementById("historyBox");
+  box.innerHTML="";
+  h.forEach(item=>{
+    let div=document.createElement("div");
+    div.innerHTML=item;
+    div.onclick=()=>window.open(item,"_blank");
+    box.appendChild(div);
+  });
+}
+
+loadHistory();
+startScanner();
+
+// PWA Install
+window.addEventListener("beforeinstallprompt",(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  installBtn.style.display="inline-block";
+});
+
+installBtn.onclick=async ()=>{
+  deferredPrompt.prompt();
+  const {outcome}=await deferredPrompt.userChoice;
+  if(outcome==="accepted"){
+    installBtn.style.display="none";
+  }
+};
+
+window.addEventListener("appinstalled",()=>{
+  document.getElementById("toast").style.display="block";
+  setTimeout(()=>toast.style.display="none",2000);
+});
+
+// Register Service Worker
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+
+</body>
+</html>
