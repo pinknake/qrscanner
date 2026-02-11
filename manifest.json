@@ -1,7 +1,7 @@
 {
   "name": "Pro QR Scanner",
   "short_name": "QR Scanner",
-  "start_url": "index.html",
+  "start_url": "scanner.html",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
