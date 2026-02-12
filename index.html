@@ -1,110 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BharatVerse – Indian Chat App</title>
-
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0d6efd">
-
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghar Manager</title>
+<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 </head>
+<body>
 
-<body class="bg-light">
+<header>
+  <h1>🏠 Ghar Manager</h1>
+  <div id="datetime"></div>
+</header>
 
-<nav class="navbar navbar-light bg-white shadow-sm">
-  <div class="container">
-    <span class="navbar-brand fw-bold">🇮🇳 BharatVerse</span>
-    <a href="login.php" class="btn btn-outline-primary btn-sm">Login</a>
-  </div>
+<nav>
+  <button onclick="showTab('dashboard')">Home</button>
+  <button onclick="showTab('kitchen')">Kitchen</button>
+  <button onclick="showTab('market')">Market</button>
+  <button onclick="showTab('lenden')">Len-Den</button>
+  <button onclick="showTab('history')">History</button>
 </nav>
 
-<div class="container my-5">
+<main>
 
-  <div class="text-center mb-5">
-
-    <button id="installBtn" class="btn btn-success d-none">
-      📲 Install App
-    </button>
-
-    <h1 class="fw-bold mt-4">Connect. Chat. Communicate.</h1>
-    <p class="text-muted mt-2">
-      BharatVerse is a simple and secure Indian chat application
-      built for private conversations.
-    </p>
-
-    <a href="login.php" class="btn btn-primary mt-3">Get Started</a>
-
+<!-- Dashboard -->
+<section id="dashboard" class="tab active">
+  <h2>📊 Aaj Ka Summary</h2>
+  <div class="card">
+    <p>Total Kharch: ₹ <span id="totalExpense">0</span></p>
+    <p>Total Entries: <span id="totalEntries">0</span></p>
   </div>
+</section>
 
-  <div class="row text-center">
-    <div class="col-md-4 mb-4">
-      <h5>🔒 Secure Chat</h5>
-      <p class="text-muted">
-        Encrypted passwords and private messaging system.
-      </p>
-    </div>
+<!-- Kitchen -->
+<section id="kitchen" class="tab">
+  <h2>🍳 Kitchen Stock</h2>
+  <input id="itemName" placeholder="Item Name">
+  <input id="itemQty" placeholder="Quantity">
+  <button onclick="addKitchen()">Add</button>
+  <ul id="kitchenList"></ul>
+</section>
 
-    <div class="col-md-4 mb-4">
-      <h5>⚡ Fast & Simple</h5>
-      <p class="text-muted">
-        Lightweight and optimized for mobile users.
-      </p>
-    </div>
+<!-- Market -->
+<section id="market" class="tab">
+  <h2>🛒 Market List</h2>
+  <input id="marketItem" placeholder="What to bring?">
+  <button onclick="addMarket()">Add</button>
+  <ul id="marketList"></ul>
+  <button onclick="shareWhatsApp()">Share to WhatsApp</button>
+</section>
 
-    <div class="col-md-4 mb-4">
-      <h5>🇮🇳 Made for India</h5>
-      <p class="text-muted">
-        Designed for Indian users with privacy in mind.
-      </p>
-    </div>
-  </div>
+<!-- Len Den -->
+<section id="lenden" class="tab">
+  <h2>💰 Len-Den Record</h2>
+  <input id="person" placeholder="Naam">
+  <input id="amount" type="number" placeholder="Amount ₹">
+  <select id="method">
+    <option>Cash</option>
+    <option>Bank</option>
+    <option>Credit Card</option>
+  </select>
+  <button onclick="addTransaction()">Save</button>
+</section>
 
-</div>
+<!-- History -->
+<section id="history" class="tab">
+  <h2>📜 History</h2>
+  <ul id="historyList"></ul>
+</section>
 
-<footer class="bg-white border-top">
-  <div class="container py-3 text-center">
-    <small>
-      <a href="about.php">About</a> ·
-      <a href="privacy-policy.php">Privacy Policy</a> ·
-      <a href="terms.php">Terms</a> ·
-      <a href="mailto:support@bharatverse.com">Contact</a>
-    </small>
-  </div>
-</footer>
+</main>
 
-<script>
-  
-// Register Service Worker
-
-let deferredPrompt;
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js")
-    .then(() => console.log("Service Worker Registered"));
-}
-
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-
-  const installBtn = document.getElementById("installBtn");
-  installBtn.classList.remove("d-none");
-
-  installBtn.addEventListener("click", async () => {
-    installBtn.classList.add("d-none");
-
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      deferredPrompt = null;
-    }
-  });
-});
-</script>
-
+<script src="app.js"></script>
 </body>
 </html>
