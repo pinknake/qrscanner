@@ -1,286 +1,111 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pro QR Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BharatVerse – Indian Chat App</title>
 
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#0d6efd">
 
-<script src="https://unpkg.com/html5-qrcode"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<style>
-body{
-margin:0;
-font-family:Arial;
-background:#0f172a;
-color:white;
-text-align:center;
-}
-
-header{
-padding:15px;
-font-size:20px;
-font-weight:bold;
-background:#1e293b;
-}
-
-#reader{
-width:90%;
-margin:20px auto;
-border-radius:15px;
-overflow:hidden;
-}
-
-button{
-padding:10px 15px;
-margin:5px;
-border:none;
-border-radius:8px;
-background:#2563eb;
-color:white;
-cursor:pointer;
-}
-
-#result{
-margin:15px;
-padding:15px;
-background:#1e293b;
-border-radius:10px;
-word-wrap:break-word;
-}
-
-#installBtn{
-display:none;
-background:#16a34a;
-}
-
-</style>
 </head>
 
-<body>
+<body class="bg-light">
 
-<header>🚀 Pro QR Scanner</header>
+<nav class="navbar navbar-light bg-white shadow-sm">
+  <div class="container">
+    <span class="navbar-brand fw-bold">🇮🇳 BharatVerse</span>
+    <a href="login.php" class="btn btn-outline-primary btn-sm">Login</a>
+  </div>
+</nav>
 
-<div id="reader"></div>
+<div class="container my-5">
 
-<div>
-<button onclick="toggleFlash()">🔦 Flash</button>
-<button onclick="switchCamera()">🔄 Camera</button>
-<button onclick="startGallery()">🖼 Gallery</button>
-<button id="installBtn">📲 Install</button>
+  <div class="text-center mb-5">
+
+    <button id="installBtn" class="btn btn-success d-none">
+      📲 Install App
+    </button>
+
+    <h1 class="fw-bold mt-4">Connect. Chat. Communicate.</h1>
+    <p class="text-muted mt-2">
+      BharatVerse is a simple and secure Indian chat application
+      built for private conversations.
+    </p>
+
+    <a href="login.php" class="btn btn-primary mt-3">Get Started</a>
+
+  </div>
+
+  <div class="row text-center">
+    <div class="col-md-4 mb-4">
+      <h5>🔒 Secure Chat</h5>
+      <p class="text-muted">
+        Encrypted passwords and private messaging system.
+      </p>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <h5>⚡ Fast & Simple</h5>
+      <p class="text-muted">
+        Lightweight and optimized for mobile users.
+      </p>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <h5>🇮🇳 Made for India</h5>
+      <p class="text-muted">
+        Designed for Indian users with privacy in mind.
+      </p>
+    </div>
+  </div>
+
 </div>
 
-<div id="result">Scan Result Will Appear Here</div>
+<footer class="bg-white border-top">
+  <div class="container py-3 text-center">
+    <small>
+      <a href="about.php">About</a> ·
+      <a href="privacy-policy.php">Privacy Policy</a> ·
+      <a href="terms.php">Terms</a> ·
+      <a href="mailto:support@bharatverse.com">Contact</a>
+    </small>
+  </div>
+</footer>
 
-  <script>
+<script>
 
-let html5QrCode;
-let cameras = [];
-let currentCameraIndex = 0;
-let deferredPrompt = null;
-let scanHistory = JSON.parse(localStorage.getItem("scanHistory")) || [];
+let deferredPrompt;
 
-/* ================= INSTALL BUTTON ================= */
-
-window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    const btn = document.getElementById("installBtn");
-    if(btn) btn.style.display = "inline-block";
-});
-
-document.getElementById("installBtn")?.addEventListener("click", async () => {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt = null;
-    }
-});
-
-/* ================= INIT SCANNER ================= */
-
-async function initScanner() {
-    try {
-        html5QrCode = new Html5Qrcode("reader");
-        cameras = await Html5Qrcode.getCameras();
-
-        if (cameras.length) {
-            currentCameraIndex = 0;
-            startScanner();
-        } else {
-            alert("No Camera Found");
-        }
-    } catch (err) {
-        console.error("Camera Error:", err);
-    }
-}
-
-function startScanner() {
-    html5QrCode.start(
-        cameras[currentCameraIndex].id,
-        { fps: 10, qrbox: 250 },
-        onScanSuccess
-    ).catch(err => console.error("Start Error:", err));
-}
-
-function stopScanner() {
-    if (html5QrCode) {
-        return html5QrCode.stop().catch(() => {});
-    }
-}
-
-/* ================= SCAN SUCCESS ================= */
-
-function onScanSuccess(decodedText) {
-    handleResult(decodedText);
-    stopScanner();
-}
-
-/* ================= CAMERA SWITCH ================= */
-
-function switchCamera() {
-    if (cameras.length > 1) {
-        currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
-        stopScanner().then(startScanner);
-    }
-}
-
-/* ================= FLASH ================= */
-
-function toggleFlash() {
-    try {
-        html5QrCode.applyVideoConstraints({
-            advanced: [{ torch: true }]
-        });
-    } catch (err) {
-        alert("Flash not supported on this device");
-    }
-}
-
-/* ================= GALLERY SCAN ================= */
-
-function scanFromGallery() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-
-    input.onchange = e => {
-        const file = e.target.files[0];
-        if (file) {
-            html5QrCode.scanFile(file, true)
-                .then(result => handleResult(result))
-                .catch(err => alert("Scan failed"));
-        }
-    };
-
-    input.click();
-}
-
-/* ================= AI ANALYSIS ================= */
-
-function analyzeQR(data) {
-    const d = data.toLowerCase();
-
-    if (d.startsWith("http")) return "🌐 Website";
-    if (d.startsWith("upi://")) return "💰 UPI Payment";
-    if (/^\+?\d{8,15}$/.test(data)) return "📞 Phone Number";
-    if (d.includes("@") && d.includes(".")) return "📧 Email";
-    return "📝 Text";
-}
-
-/* ================= HANDLE RESULT ================= */
-
-function handleResult(data) {
-
-    const type = analyzeQR(data);
-
-    document.getElementById("result").innerHTML =
-        `<b>Result:</b><br>${data}<br><br><b>Type:</b> ${type}`;
-
-    createActions(data);
-    saveHistory(data, type);
-    renderHistory();
-}
-
-/* ================= ACTION BUTTONS ================= */
-
-function createActions(data) {
-    const box = document.getElementById("actions");
-    box.innerHTML = "";
-
-    if (data.startsWith("http")) {
-        box.innerHTML += `<button class="action-btn" onclick="window.open('${data}','_blank')">🌐 Open</button>`;
-    }
-
-    if (data.startsWith("upi://")) {
-        box.innerHTML += `<button class="action-btn" onclick="window.location.href='${data}'">💰 Pay</button>`;
-    }
-
-    box.innerHTML += `<button class="action-btn" onclick="copyText('${encodeURIComponent(data)}')">📋 Copy</button>`;
-
-    box.innerHTML += `<button class="action-btn" onclick="restartScan()">🔄 Scan Again</button>`;
-}
-
-function copyText(encoded) {
-    const text = decodeURIComponent(encoded);
-    navigator.clipboard.writeText(text);
-    alert("Copied!");
-}
-
-function restartScan() {
-    document.getElementById("actions").innerHTML = "";
-    document.getElementById("result").innerHTML = "Scanning...";
-    startScanner();
-}
-
-/* ================= HISTORY ================= */
-
-function saveHistory(data, type) {
-
-    scanHistory.unshift({
-        text: data,
-        type: type,
-        time: new Date().toLocaleString()
-    });
-
-    if (scanHistory.length > 20) scanHistory.pop();
-
-    localStorage.setItem("scanHistory", JSON.stringify(scanHistory));
-}
-
-function renderHistory() {
-
-    const box = document.getElementById("history");
-    box.innerHTML = "<h3>History</h3>";
-
-    scanHistory.forEach((item, index) => {
-
-        const div = document.createElement("div");
-        div.className = "history-item";
-        div.innerHTML =
-            `${item.type}<br><small>${item.text.substring(0, 30)}</small>`;
-
-        div.addEventListener("click", () => {
-            handleResult(item.text);
-        });
-
-        box.appendChild(div);
-    });
-}
-
-/* ================= SERVICE WORKER ================= */
-
+// Register Service Worker
 if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js")
-        .catch(err => console.log("SW Error:", err));
+      .then(() => console.log("Service Worker Registered"))
+      .catch(err => console.log("SW Error:", err));
+  });
 }
 
-/* ================= START APP ================= */
+// Install Button Logic
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
 
-renderHistory();
-initScanner();
+  const installBtn = document.getElementById("installBtn");
+  installBtn.classList.remove("d-none");
+
+  installBtn.addEventListener("click", async () => {
+    installBtn.classList.add("d-none");
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  });
+});
 
 </script>
+
 </body>
 </html>
